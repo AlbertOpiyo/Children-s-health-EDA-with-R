@@ -1,0 +1,432 @@
+---
+title: "Internship task"
+output: html_document
+date: "2023-07-21"
+---
+
+You have been provided with a document and are required to perform an exploratory data analysis,which will help in decision making.
+
+I will first import the necessary libraries needed to work with the data
+```{r}
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(ggthemes)
+library(DT)
+library(tidyr)
+library(ggplot2)
+library(dplyr)
+library(TSA)
+library(corrplot)
+```
+
+Let me import the dataset
+```{r}
+CEMA<-read.csv("C:/Users/ADMIN/Desktop/kaggle/cema_internship_task_2023.csv")
+
+```
+
+Confirmation that the dataset has been uploaded
+```{r}
+View(CEMA)
+head(CEMA)
+```
+Attributes of the dataset
+```{r}
+attributes(CEMA)
+```
+summary of the dataset
+```{r}
+summary(CEMA)
+
+str(CEMA)
+```
+
+`The following things are evident
+
+1. There are some null values in the dataset
+2. The date column is a character- it should be converted to datetime for easy analysis
+3. Columns should be renamed
+
+## Renaming of columns
+```{r}
+CEMA <- CEMA %>%
+  rename(Total_Dewormed = Total.Dewormed, Acute_Malnutrition= Acute.Malnutrition, 
+         stunted_6_to_23months = stunted.6.23.months,stunted_0_to_6months=stunted.0..6.months,
+         stunted_24_to_59months=stunted.24.59.months, Diarrhoea_cases=diarrhoea.cases,
+         Underweight_0_to_6months=Underweight.0..6.months,Underweight_6_to_23months=Underweight.6.23.months,
+         Underweight_24_to_59months=Underweight.24.59.Months)
+```
+```{r}
+head(CEMA)
+```
+## Working on the null values
+There are various null values in the dataset. It will be difficult to work with them. I will therefore replace the null values with zero
+```{r}
+CEMA <- as.data.frame(lapply(CEMA, function(x) replace(x, is.na(x), 0)))
+```
+
+## Working on the Period(Date column)
+The date column is a character. It should be converted to a datetime for easy analysis
+```{r}
+# Create a lookup table for month abbreviations to full names
+  month_lookup <- setNames(month.name, tolower(month.abb))
+  
+  # Split the date_str column into month and year parts
+  CEMA<- CEMA %>%
+    mutate(
+      month_str = tolower(substr(CEMA$period, 1, 3)),
+      year_str = substr(CEMA$period, 5, 6))
+  
+  # Convert the month_str to full month names
+  CEMA$month_str <- month_lookup[CEMA$month_str]
+  
+  # Convert the two-digit year to a full year format for years 2021-2023
+  CEMA$year_str <- ifelse(as.numeric(CEMA$year_str) < 21, 2000 + as.numeric(CEMA$year_str), 1900 + as.numeric(CEMA$year_str))
+  CEMA$year_str <- ifelse(CEMA$year_str < 2021, CEMA$year_str + 100, CEMA$year_str)
+ 
+   # Combine year, month, and day to form the datetime_column
+  CEMA$datetime_column <- ymd(paste(CEMA$year_str, CEMA$month_str, "01"))
+  
+```
+
+Lets check the dataset
+```{r}
+head(CEMA)
+```
+# EXPLORATORY DATA ANALYSIS
+
+After cleaning the data I shall conduct an exploratory data analysis.
+
+I will answer the following questions
+
+1. County with the highest number of dewormed children over the period
+2. which county recorded the highest number of children with malnutrition over the period
+3.Which county recorded the highest number of children with diarrhoea cases
+4. The number of children with stunted growth in each county for the whole period
+5. Number of underweight children per county each year
+6. whats the correlation between the various factors
+7. The trend for different cases each year
+
+### County with the highest number of dewormed children
+```{r}
+  total_dewormed<- CEMA %>%
+    group_by(county) %>%
+    summarize(Total= sum(Total_Dewormed)) %>%
+    arrange(desc(Total))
+
+datatable(total_dewormed)
+```
+Nairobi county has the most number of dewormed children in the whole period while lamu county has the least number of dewormed children
+
+
+##  counties with the highest  and lowest numbers of chidren with acute malnutrition for the whole period?
+```{r}
+
+total_acMaln<- CEMA %>%
+  group_by(county) %>%
+  summarize(Total= sum(Acute_Malnutrition)) %>%
+  arrange(desc(Total))
+
+datatable(total_acMaln)
+```
+Wajir county has the highest number of cases while Lamu, Kericho while Elgeyo Marakwet have no recorded cases
+
+
+### County with the highest numbers of diarrhoea cases recorded
+
+```{r}
+total_diarrhoea<- CEMA %>%
+  group_by(county) %>%
+  summarize(Total= sum(Diarrhoea_cases)) %>%
+  arrange(desc(Total))
+
+datatable(total_diarrhoea)
+```
+Nairobi county has the highest number of cases recorded while Vihiga county has the least number of cases
+
+### Number of children with stunted growth per county
+1, Between 6 and 23 months
+```{r}
+stunted_growth_6_23months<- CEMA %>%
+  group_by(county) %>%
+  summarize(Total= sum(stunted_6_to_23months)) %>%
+  arrange(desc(Total))
+
+datatable(stunted_growth_6_23months)
+```
+
+2.Between 0 and 6 months
+```{r}
+stunted_growth_0_6months<- CEMA %>%
+  group_by(county) %>%
+  summarize(Total= sum(stunted_0_to_6months)) %>%
+  arrange(desc(Total))
+
+datatable(stunted_growth_0_6months)
+```
+
+3. Between 24 and 59 months
+```{r}
+stunted_growth_24_59months<- CEMA %>%
+  group_by(county) %>%
+  summarize(Total= sum(stunted_24_to_59months)) %>%
+  arrange(desc(Total))
+
+datatable(stunted_growth_24_59months)
+```
+
+the data shows that children in Nairobi  between ages 0 and 23 months have the highest number of stunted growth cases recorded while children 24 and 59 months in Turkana have the highest number of records of stunted growth. Nairobi comes second in 24 and 59 months.
+
+The data might be biased since we have only 6 months record for the year 2023.
+
+### Record of underweight children
+1. Underweight children  between 0 and 6 months for the whole period
+```{r}
+underweight_0_6months<- CEMA %>%
+  group_by(county) %>%
+  summarize(Total= sum(Underweight_0_to_6months)) %>%
+  arrange(desc(Total))
+
+datatable(underweight_0_6months)
+```
+
+2.Underweight children  between 6 and 23 months for the whole period
+```{r}
+underweight_6_23months<- CEMA %>%
+  group_by(county) %>%
+  summarize(Total= sum(Underweight_6_to_23months)) %>%
+  arrange(desc(Total))
+
+datatable(underweight_6_23months)
+```
+
+3. Underweight children  between 24 and 59 months for the whole period 
+```{r}
+underweight_24_59months<- CEMA %>%
+  group_by(county) %>%
+  summarize(Total= sum(Underweight_24_to_59months)) %>%
+  arrange(desc(Total))
+
+datatable(underweight_24_59months)
+```
+
+
+Nairobi county has the highest recorded number of underweight children between 0 and 23 months while Turkana has the highest number of underweight children between 24 and 59 months.
+
+### How does the different characters correlate
+```{r}
+correlation_matrix <- cor(CEMA[c('Total_Dewormed','Acute_Malnutrition','stunted_6_to_23months',
+                                 'stunted_0_to_6months','stunted_24_to_59months','Diarrhoea_cases',
+                                 'Underweight_0_to_6months','Underweight_6_to_23months','Underweight_24_to_59months')])
+```
+```{r}
+corrplot(correlation_matrix, method = "color", tl.col = "black", title = "Correlation Matrix" , tl.cex = 0.5)
+
+```
+
+There is no correlation between the diffferent factors
+
+
+### The trend for different cases each year
+1. the trend of children dewormed in 2021
+```{r}
+total_year_dewormed_2021 <- CEMA %>%
+  filter(between(datetime_column, as.Date('2021-01-01'), as.Date('2021-12-31'))) %>%
+  group_by(datetime_column) %>%
+  summarize(Total_Dewormed = sum(Total_Dewormed))
+```
+
+
+```{r}
+datatable(total_year_dewormed_2021) 
+```
+
+```{r}
+ggplot(total_year_dewormed_2021, aes(x = datetime_column, y = Total_Dewormed, group = 1)) +
+  geom_line(color = "steelblue", size = 1.5) +
+  geom_point(color = "red", size = 3) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b") +
+  labs(x = "Date", y = "Total Dewormed", title = "Trend of Children Dewormed in 2021") +
+  theme_minimal()
+```
+2. Trend of children dewormed in 2022
+```{r}
+# the trend of children dewormed in 2022
+total_year_dewormed_2022 <- CEMA %>%
+  filter(between(datetime_column, as.Date('2022-01-01'), as.Date('2022-12-31'))) %>%
+  group_by(datetime_column) %>%
+  summarize(Total_Dewormed = sum(Total_Dewormed))
+
+datatable(total_year_dewormed_2022)
+```
+
+```{r}
+ggplot(total_year_dewormed_2022, aes(x = datetime_column, y = Total_Dewormed, group = 1)) +
+  geom_line(color = "steelblue", size = 1.5) +
+  geom_point(color = "red", size = 3) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b") +
+  labs(x = "Date", y = "Total Dewormed", title = "Trend of Children Dewormed in 2022") +
+  theme_minimal()
+```
+
+3. Trend of children dewormed in 2023
+```{r}
+# the trend of children dewormed in 2023
+total_year_dewormed_2023 <- CEMA %>%
+  filter(between(datetime_column, as.Date('2023-01-01'), as.Date('2023-06-30'))) %>%
+  group_by(datetime_column) %>%
+  summarize(Total_Dewormed = sum(Total_Dewormed))
+
+datatable(total_year_dewormed_2023)
+```
+```{r}
+ggplot(total_year_dewormed_2023, aes(x = datetime_column, y = Total_Dewormed, group = 1)) +
+  geom_line(color = "steelblue", size = 1.5) +
+  geom_point(color = "red", size = 3) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b") +
+  labs(x = "Date", y = "Total Dewormed", title = "Trend of Children Dewormed in 2023") +
+  theme_minimal()
+```
+
+According to the data and the charts( 2021, 2022 and 2023), there is a spike of children getting dewormed from May and June. The first four months gets few records of children being dewormed
+
+## Trend in diarrhoea cases
+1. Trend in year 2021
+```{r}
+# 2021 trend
+diarrhea_cases_2021 <- CEMA %>%
+  filter(between(datetime_column, as.Date('2021-01-01'), as.Date('2021-12-31'))) %>%
+  group_by(datetime_column) %>%
+  summarize(Total_Diarrhoea= sum(Diarrhoea_cases))
+
+datatable(diarrhea_cases_2021)
+```
+
+```{r}
+ggplot(diarrhea_cases_2021, aes(x = datetime_column, y = Total_Diarrhoea, group = 1)) +
+  geom_line(color = "steelblue", size = 1.5) +
+  geom_point(color = "red", size = 3) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b") +
+  labs(x = "Date", y = "Total Diarrhoea Cases", title = "Diarrhoea cases  in 2021") +
+  theme_minimal()
+```
+
+There was a spike from January to February though in the succeeding months the cases have been irregular
+
+
+
+2. Trend in year 2022
+```{r}
+# 2022
+diarrhea_cases_2022 <- CEMA %>%
+  filter(between(datetime_column, as.Date('2022-01-01'), as.Date('2022-12-31'))) %>%
+  group_by(datetime_column) %>%
+  summarize(Total_Diarrhoea= sum(Diarrhoea_cases))
+
+datatable(diarrhea_cases_2022)
+```
+
+```{r}
+ggplot(diarrhea_cases_2022, aes(x = datetime_column, y = Total_Diarrhoea, group = 1)) +
+  geom_line(color = "steelblue", size = 1.5) +
+  geom_point(color = "red", size = 3) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b") +
+  labs(x = "Date", y = "Total Diarrhoea Cases", title = "Diarrhoea cases  in 2022") +
+  theme_minimal()
+```
+
+There has been a drop of diarrhoea cases throughout year 2022
+
+
+
+3. The trend of diarrhoea in 2023
+
+```{r}
+diarrhea_cases_2023 <- CEMA %>%
+  filter(between(datetime_column, as.Date('2023-01-01'), as.Date('2023-06-30'))) %>%
+  group_by(datetime_column) %>%
+  summarize(Total_Diarrhoea= sum(Diarrhoea_cases))
+
+datatable(diarrhea_cases_2023)
+```
+
+```{r}
+ggplot(diarrhea_cases_2023, aes(x = datetime_column, y = Total_Diarrhoea, group = 1)) +
+  geom_line(color = "steelblue", size = 1.5) +
+  geom_point(color = "red", size = 3) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b") +
+  labs(x = "Date", y = "Total Diarrhoea Cases", title = "Diarrhoea cases  in 2023") +
+  theme_minimal()
+```
+
+Diarrhoea cases for the year 2023 have been rising and falling irregularly for the six month period
+
+
+### cases of acute malnutrition recorded
+1. trend in 2021
+```{r}
+acute_malnutrition_2021 <- CEMA %>%
+  filter(between(datetime_column, as.Date('2021-01-01'), as.Date('2021-12-31'))) %>%
+  group_by(datetime_column) %>%
+  summarize(Total= sum(Acute_Malnutrition))
+
+datatable(acute_malnutrition_2021)
+
+```
+
+```{r}
+ggplot(acute_malnutrition_2021, aes(x = datetime_column, y = Total, group = 1)) +
+  geom_line(color = "steelblue", size = 1.5) +
+  geom_point(color = "red", size = 3) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b") +
+  labs(x = "Date", y = "Total Malnutrition Cases", title = "Acute Malnutrition cases in 2021") +
+  theme_minimal()
+```
+
+April and November have the highest number of malnutrition cases recorded in 2021
+
+2. trend in 2022
+```{r}
+# 2022
+acute_malnutrition_2022 <- CEMA %>%
+  filter(between(datetime_column, as.Date('2022-01-01'), as.Date('2022-12-31'))) %>%
+  group_by(datetime_column) %>%
+  summarize(Total= sum(Acute_Malnutrition))
+
+datatable(acute_malnutrition_2022)
+```
+
+```{r}
+ggplot(acute_malnutrition_2022, aes(x = datetime_column, y = Total, group = 1)) +
+  geom_line(color = "steelblue", size = 1.5) +
+  geom_point(color = "red", size = 3) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b") +
+  labs(x = "Date", y = "Total Malnutrition Cases", title = "Acute Malnutrition cases in 2022") +
+  theme_minimal()
+```
+
+There has been a sharp  increase in cases in October  2022
+
+3. trend in 2023
+
+```{r}
+acute_malnutrition_2023 <- CEMA %>%
+  filter(between(datetime_column, as.Date('2023-01-01'), as.Date('2023-06-30'))) %>%
+  group_by(datetime_column) %>%
+  summarize(Total= sum(Acute_Malnutrition))
+
+datatable(acute_malnutrition_2023)
+```
+
+```{r}
+ggplot(acute_malnutrition_2023, aes(x = datetime_column, y = Total, group = 1)) +
+  geom_line(color = "steelblue", size = 1.5) +
+  geom_point(color = "red", size = 3) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b") +
+  labs(x = "Date", y = "Total Malnutrition Cases", title = "Acute Malnutrition cases in 2023") +
+  theme_minimal()
+```
+
+
+The trend is irregukar for the first 6 months of 2023
